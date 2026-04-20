@@ -188,11 +188,11 @@
   #hud {
     position: absolute;
     top: 0; left: 0; right: 0;
-    display: flex; justify-content: space-between; align-items: center; gap: 8px;
-    padding: 12px 124px 12px 16px;
+    display: flex; justify-content: space-between; align-items: center; gap: 6px;
+    padding: 12px 172px 12px 12px;
     padding-top: max(12px, env(safe-area-inset-top));
     font-weight: bold;
-    font-size: clamp(14px, 2.2vw, 18px);
+    font-size: clamp(13px, 2.2vw, 18px);
     pointer-events: none;
     z-index: 2;
     flex-wrap: wrap;
@@ -203,7 +203,7 @@
   #hud .combo { color: var(--accent2); }
   #hud .level { color: var(--good); }
 
-  #mute-btn, #abort-btn {
+  #mute-btn, #abort-btn, #music-btn {
     position: absolute;
     top: max(12px, env(safe-area-inset-top));
     width: 44px; height: 44px;
@@ -211,16 +211,20 @@
     background: rgba(5,5,26,0.6);
     border: 2px solid rgba(99,226,255,0.35);
     color: var(--ink);
-    font-size: 20px;
+    font-size: 16px;
+    font-weight: bold;
     cursor: pointer;
     z-index: 3;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
-  #mute-btn { right: 12px; }
+  #mute-btn { right: 12px; font-size: 20px; }
+  #music-btn { right: 62px; }
+  #music-btn.off { color: var(--dim); border-color: rgba(127, 133, 168, 0.4); }
   #abort-btn {
-    right: 64px;
+    right: 112px;
     border-color: rgba(255, 94, 108, 0.5);
     color: var(--bad);
-    font-weight: bold;
   }
   #abort-btn:hover { background: rgba(255, 94, 108, 0.2); }
 
@@ -458,6 +462,7 @@
 <div id="screen-game" class="screen" hidden style="padding:0;">
   <canvas id="game-canvas"></canvas>
   <button id="abort-btn" title="Abbrechen">✕</button>
+  <button id="music-btn" title="Musik">♪1</button>
   <button id="mute-btn">🔊</button>
   <div id="hud">
     <div class="score">⭐ <span id="hud-score">0</span></div>
@@ -662,6 +667,171 @@
     },
   };
   function updateMuteBtn() { $('mute-btn').textContent = state.muted ? '🔇' : '🔊'; }
+
+  // ---------- Music (4 synth tracks + mute) ----------
+  // Each track is a 16-step pattern at its own BPM. MIDI notes; 0 = rest.
+  const MUSIC_TRACKS = [
+    null,
+    { // 1 - Drift (ambient Am)
+      name: 'Drift', bpm: 88,
+      bass: [45,0,0,0, 0,0,0,0, 40,0,0,0, 43,0,0,0],
+      arp:  [69,72,76,79, 72,76,79,72, 72,76,79,83, 76,79,72,76],
+      drum: [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+      bassType: 'sawtooth', arpType: 'sine', filter: 900,
+    },
+    { // 2 - Chase (driving Dm)
+      name: 'Chase', bpm: 128,
+      bass: [38,0,38,0, 38,0,0,38, 36,0,36,0, 36,0,38,38],
+      arp:  [0,77,0,74, 0,77,0,81, 0,74,0,79, 77,0,72,0],
+      drum: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,1,1,0],
+      bassType: 'sawtooth', arpType: 'square', filter: 1700,
+    },
+    { // 3 - Pulse (syncopated Em)
+      name: 'Pulse', bpm: 108,
+      bass: [40,0,0,40, 0,40,0,0, 43,0,0,43, 0,45,0,47],
+      arp:  [76,0,79,0, 76,0,83,0, 79,0,76,0, 79,0,83,0],
+      drum: [1,0,0,1, 0,1,1,0, 1,0,0,1, 0,1,1,1],
+      bassType: 'triangle', arpType: 'triangle', filter: 1300,
+    },
+    { // 4 - Nova (uplifting C major)
+      name: 'Nova', bpm: 140,
+      bass: [36,0,36,0, 43,0,0,43, 41,0,41,0, 45,0,0,45],
+      arp:  [72,76,79,84, 79,76,72,76, 77,81,84,89, 84,81,77,79],
+      drum: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,1],
+      bassType: 'sawtooth', arpType: 'sine', filter: 2200,
+    },
+  ];
+
+  let musicMode = parseInt(localStorage.getItem('reihen-music') || '1', 10);
+  if (isNaN(musicMode) || musicMode < 0 || musicMode > 4) musicMode = 1;
+
+  const musicRt = { step: 0, nextTime: 0, timerId: null, gain: null };
+
+  function noteFreq(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
+
+  function musicEnsureGain() {
+    const ac = ensureAudio();
+    if (!ac) return null;
+    if (!musicRt.gain || musicRt.gain.context !== ac) {
+      musicRt.gain = ac.createGain();
+      musicRt.gain.gain.value = 0.2;
+      musicRt.gain.connect(ac.destination);
+    }
+    return musicRt.gain;
+  }
+
+  function musicStart() {
+    if (musicMode === 0) return;
+    const ac = ensureAudio();
+    if (!ac) return;
+    if (musicRt.timerId) return;
+    musicEnsureGain();
+    musicRt.step = 0;
+    musicRt.nextTime = ac.currentTime + 0.1;
+    musicTick();
+  }
+
+  function musicStop() {
+    if (musicRt.timerId) {
+      clearTimeout(musicRt.timerId);
+      musicRt.timerId = null;
+    }
+    if (musicRt.gain) {
+      const g = musicRt.gain;
+      try {
+        const ac = g.context;
+        g.gain.cancelScheduledValues(ac.currentTime);
+        g.gain.setValueAtTime(g.gain.value, ac.currentTime);
+        g.gain.linearRampToValueAtTime(0, ac.currentTime + 0.08);
+        setTimeout(() => { try { g.disconnect(); } catch(e) {} }, 120);
+      } catch (e) {}
+      musicRt.gain = null;
+    }
+  }
+
+  function musicTick() {
+    const track = MUSIC_TRACKS[musicMode];
+    if (!track) return;
+    const ac = audioCtx;
+    if (!ac) return;
+    const stepDur = 60 / track.bpm / 4;
+    while (musicRt.nextTime < ac.currentTime + 0.18) {
+      playMusicStep(track, musicRt.step, musicRt.nextTime);
+      musicRt.step = (musicRt.step + 1) % 16;
+      musicRt.nextTime += stepDur;
+    }
+    musicRt.timerId = setTimeout(musicTick, 30);
+  }
+
+  function playMusicStep(track, step, time) {
+    const ac = audioCtx;
+    const out = musicRt.gain;
+    if (!ac || !out) return;
+    const beat = 60 / track.bpm;
+
+    const bn = track.bass[step];
+    if (bn) {
+      const osc = ac.createOscillator();
+      const g = ac.createGain();
+      const filter = ac.createBiquadFilter();
+      osc.type = track.bassType || 'sawtooth';
+      osc.frequency.value = noteFreq(bn);
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(track.filter * 1.8, time);
+      filter.frequency.exponentialRampToValueAtTime(Math.max(200, track.filter * 0.5), time + beat * 0.5);
+      filter.Q.value = 4;
+      g.gain.setValueAtTime(0, time);
+      g.gain.linearRampToValueAtTime(0.4, time + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.001, time + beat * 0.95);
+      osc.connect(filter).connect(g).connect(out);
+      osc.start(time);
+      osc.stop(time + beat);
+    }
+
+    const an = track.arp[step];
+    if (an) {
+      const osc = ac.createOscillator();
+      const g = ac.createGain();
+      osc.type = track.arpType || 'triangle';
+      osc.frequency.value = noteFreq(an);
+      const dur = beat * 0.5;
+      g.gain.setValueAtTime(0, time);
+      g.gain.linearRampToValueAtTime(0.14, time + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      // Subtle detune
+      const osc2 = ac.createOscillator();
+      osc2.type = osc.type;
+      osc2.frequency.value = noteFreq(an) * 1.005;
+      osc2.connect(g);
+      osc.connect(g).connect(out);
+      osc.start(time); osc2.start(time);
+      osc.stop(time + dur + 0.05); osc2.stop(time + dur + 0.05);
+    }
+
+    if (track.drum[step]) {
+      const bufSize = Math.floor(ac.sampleRate * 0.06);
+      const buf = ac.createBuffer(1, bufSize, ac.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
+      const src = ac.createBufferSource();
+      src.buffer = buf;
+      const filter = ac.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.value = 5500;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.13, time);
+      g.gain.exponentialRampToValueAtTime(0.001, time + 0.06);
+      src.connect(filter).connect(g).connect(out);
+      src.start(time);
+    }
+  }
+
+  function updateMusicBtn() {
+    const btn = $('music-btn');
+    if (!btn) return;
+    btn.textContent = musicMode === 0 ? '♪×' : '♪' + musicMode;
+    btn.classList.toggle('off', musicMode === 0);
+  }
 
   // ---------- Questions ----------
   function pickQuestion() {
@@ -1060,6 +1230,7 @@
   // ---------- Screens ----------
   function showStart() {
     state.screen = 'start';
+    musicStop();
     screenStart.hidden = false;
     screenGame.hidden = true;
     screenOver.hidden = true;
@@ -1105,10 +1276,12 @@
     if (!isMobileLayout()) answerInput.focus();
     spawnAsteroid();
     state.spawnTimer = DIFFS[state.difficulty].spawnMs * tune().spawn;
+    musicStart();
   }
 
   function gameOver() {
     state.screen = 'over';
+    musicStop();
     sfx.gameover();
     const entry = { score: state.score, level: state.level, difficulty: state.difficulty, date: Date.now() };
     const { list, rank, isNew } = addHighscore(entry);
@@ -1199,6 +1372,7 @@
   $('btn-resume').addEventListener('click', () => {
     state.paused = false;
     $('pause-overlay').hidden = true;
+    musicStart();
     if (!isMobileLayout()) answerInput.focus();
   });
 
@@ -1206,6 +1380,16 @@
     state.muted = !state.muted;
     localStorage.setItem('reihen-muted', state.muted ? '1' : '0');
     updateMuteBtn();
+  });
+
+  $('music-btn').addEventListener('click', () => {
+    musicMode = (musicMode + 1) % 5;
+    localStorage.setItem('reihen-music', musicMode);
+    updateMusicBtn();
+    musicStop();
+    if (musicMode > 0 && state.screen === 'game' && !state.paused) {
+      musicStart();
+    }
   });
 
   $('abort-btn').addEventListener('click', () => {
@@ -1228,6 +1412,8 @@
     if (e.key === 'Escape') {
       state.paused = !state.paused;
       $('pause-overlay').hidden = !state.paused;
+      if (state.paused) musicStop();
+      else musicStart();
       if (!state.paused && !isMobileLayout()) answerInput.focus();
     }
   });
@@ -1310,6 +1496,7 @@
 
   // Init
   updateMuteBtn();
+  updateMusicBtn();
   showStart();
   resize();
   requestAnimationFrame(tick);
