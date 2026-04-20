@@ -316,8 +316,12 @@
 
   /* Only show keypad on mobile; hide text-input wrapper on mobile */
   #keypad { display: none; }
-  body.mobile #keypad { display: block; }
+  body.mobile #keypad { display: block; padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); }
   body.mobile #answer-wrap { display: none; }
+  body.mobile #keypad-display { font-size: 28px; min-height: 36px; padding: 2px 0 6px; letter-spacing: 6px; }
+  body.mobile #keypad-grid { gap: 6px; max-width: 340px; }
+  body.mobile .key { height: 44px; font-size: 20px; border-radius: 10px; border-width: 1.5px; }
+  body.mobile .key-fn { font-size: 22px; }
 
   #pause-overlay {
     position: absolute; inset: 0;
@@ -701,7 +705,7 @@
   // ---------- Asteroids ----------
   function spawnAsteroid() {
     const q = pickQuestion();
-    const radius = 48 + Math.random() * 12;
+    const radius = isMobileLayout() ? (32 + Math.random() * 8) : (48 + Math.random() * 12);
     const diff = DIFFS[state.difficulty];
     const speed = diff.speed + (state.level - 1) * diff.levelSpeed + Math.random() * 0.1;
     state.asteroids.push({
