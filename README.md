@@ -29,5 +29,15 @@ Einfach `index.html` im Browser öffnen – oder online:
 
 - HTML, CSS, JS – alles in einer Datei
 - Canvas 2D für Grafik
-- Web Audio API für Sound (synthetisiert, keine Dateien)
+- Web Audio API für SFX (synthetisiert)
+- 4 royalty-free Musik-Tracks als MP3 (HTML Audio)
 - localStorage für High-Score und Mute-Setting
+
+## Musik-Credits
+
+4 Tracks von [Kevin MacLeod (incompetech.com)](https://incompetech.com/), lizenziert unter [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/):
+
+- Track 1: *8bit Dungeon Boss*
+- Track 2: *8bit Dungeon Level*
+- Track 3: *Bit Quest*
+- Track 4: *Bit Shift*

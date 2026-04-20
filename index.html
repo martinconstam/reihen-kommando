@@ -389,6 +389,8 @@
   .stats b { color: var(--bad); }
 
   .btn-row { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; justify-content: center; }
+  .music-credit { color: var(--dim); font-size: 11px; margin-top: 14px; text-align: center; }
+  .music-credit a { color: var(--dim); text-decoration: underline; }
 
   /* Install PWA */
   #install-panel {
@@ -456,6 +458,8 @@
     <h3>🏆 Bestenliste</h3>
     <ol class="hs-list" id="hs-list"></ol>
   </div>
+
+  <p class="music-credit">Musik: <a href="https://incompetech.com/" target="_blank" rel="noopener">Kevin MacLeod</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></p>
 </div>
 
 <!-- Game screen -->
@@ -668,162 +672,45 @@
   };
   function updateMuteBtn() { $('mute-btn').textContent = state.muted ? '🔇' : '🔊'; }
 
-  // ---------- Music (4 synth tracks + mute) ----------
-  // Each track is a 16-step pattern at its own BPM. MIDI notes; 0 = rest.
+  // ---------- Music (4 royalty-free tracks by Kevin MacLeod, CC-BY) ----------
   const MUSIC_TRACKS = [
     null,
-    { // 1 - Drift (ambient Am)
-      name: 'Drift', bpm: 88,
-      bass: [45,0,0,0, 0,0,0,0, 40,0,0,0, 43,0,0,0],
-      arp:  [69,72,76,79, 72,76,79,72, 72,76,79,83, 76,79,72,76],
-      drum: [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
-      bassType: 'sawtooth', arpType: 'sine', filter: 900,
-    },
-    { // 2 - Chase (driving Dm)
-      name: 'Chase', bpm: 128,
-      bass: [38,0,38,0, 38,0,0,38, 36,0,36,0, 36,0,38,38],
-      arp:  [0,77,0,74, 0,77,0,81, 0,74,0,79, 77,0,72,0],
-      drum: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,1,1,0],
-      bassType: 'sawtooth', arpType: 'square', filter: 1700,
-    },
-    { // 3 - Pulse (syncopated Em)
-      name: 'Pulse', bpm: 108,
-      bass: [40,0,0,40, 0,40,0,0, 43,0,0,43, 0,45,0,47],
-      arp:  [76,0,79,0, 76,0,83,0, 79,0,76,0, 79,0,83,0],
-      drum: [1,0,0,1, 0,1,1,0, 1,0,0,1, 0,1,1,1],
-      bassType: 'triangle', arpType: 'triangle', filter: 1300,
-    },
-    { // 4 - Nova (uplifting C major)
-      name: 'Nova', bpm: 140,
-      bass: [36,0,36,0, 43,0,0,43, 41,0,41,0, 45,0,0,45],
-      arp:  [72,76,79,84, 79,76,72,76, 77,81,84,89, 84,81,77,79],
-      drum: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,1],
-      bassType: 'sawtooth', arpType: 'sine', filter: 2200,
-    },
+    { name: '8bit Dungeon Boss',  src: 'music/track1.mp3' },
+    { name: '8bit Dungeon Level', src: 'music/track2.mp3' },
+    { name: 'Bit Quest',          src: 'music/track3.mp3' },
+    { name: 'Bit Shift',          src: 'music/track4.mp3' },
   ];
 
   let musicMode = parseInt(localStorage.getItem('reihen-music') || '1', 10);
   if (isNaN(musicMode) || musicMode < 0 || musicMode > 4) musicMode = 1;
 
-  const musicRt = { step: 0, nextTime: 0, timerId: null, gain: null };
+  const musicAudio = new Audio();
+  musicAudio.loop = true;
+  musicAudio.preload = 'auto';
+  musicAudio.volume = 0.45;
 
-  function noteFreq(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
-
-  function musicEnsureGain() {
-    const ac = ensureAudio();
-    if (!ac) return null;
-    if (!musicRt.gain || musicRt.gain.context !== ac) {
-      musicRt.gain = ac.createGain();
-      musicRt.gain.gain.value = 0.2;
-      musicRt.gain.connect(ac.destination);
-    }
-    return musicRt.gain;
-  }
+  let musicShouldPlay = false;
 
   function musicStart() {
-    if (musicMode === 0) return;
-    const ac = ensureAudio();
-    if (!ac) return;
-    if (musicRt.timerId) return;
-    musicEnsureGain();
-    musicRt.step = 0;
-    musicRt.nextTime = ac.currentTime + 0.1;
-    musicTick();
+    if (musicMode === 0) {
+      musicShouldPlay = false;
+      return;
+    }
+    musicShouldPlay = true;
+    const track = MUSIC_TRACKS[musicMode];
+    if (!track) return;
+    // Load new track if changed
+    if (!musicAudio.src.endsWith(track.src)) {
+      musicAudio.src = track.src;
+    }
+    musicAudio.play().catch(() => {
+      // Autoplay can fail before user gesture; will retry on next click.
+    });
   }
 
   function musicStop() {
-    if (musicRt.timerId) {
-      clearTimeout(musicRt.timerId);
-      musicRt.timerId = null;
-    }
-    if (musicRt.gain) {
-      const g = musicRt.gain;
-      try {
-        const ac = g.context;
-        g.gain.cancelScheduledValues(ac.currentTime);
-        g.gain.setValueAtTime(g.gain.value, ac.currentTime);
-        g.gain.linearRampToValueAtTime(0, ac.currentTime + 0.08);
-        setTimeout(() => { try { g.disconnect(); } catch(e) {} }, 120);
-      } catch (e) {}
-      musicRt.gain = null;
-    }
-  }
-
-  function musicTick() {
-    const track = MUSIC_TRACKS[musicMode];
-    if (!track) return;
-    const ac = audioCtx;
-    if (!ac) return;
-    const stepDur = 60 / track.bpm / 4;
-    while (musicRt.nextTime < ac.currentTime + 0.18) {
-      playMusicStep(track, musicRt.step, musicRt.nextTime);
-      musicRt.step = (musicRt.step + 1) % 16;
-      musicRt.nextTime += stepDur;
-    }
-    musicRt.timerId = setTimeout(musicTick, 30);
-  }
-
-  function playMusicStep(track, step, time) {
-    const ac = audioCtx;
-    const out = musicRt.gain;
-    if (!ac || !out) return;
-    const beat = 60 / track.bpm;
-
-    const bn = track.bass[step];
-    if (bn) {
-      const osc = ac.createOscillator();
-      const g = ac.createGain();
-      const filter = ac.createBiquadFilter();
-      osc.type = track.bassType || 'sawtooth';
-      osc.frequency.value = noteFreq(bn);
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(track.filter * 1.8, time);
-      filter.frequency.exponentialRampToValueAtTime(Math.max(200, track.filter * 0.5), time + beat * 0.5);
-      filter.Q.value = 4;
-      g.gain.setValueAtTime(0, time);
-      g.gain.linearRampToValueAtTime(0.4, time + 0.008);
-      g.gain.exponentialRampToValueAtTime(0.001, time + beat * 0.95);
-      osc.connect(filter).connect(g).connect(out);
-      osc.start(time);
-      osc.stop(time + beat);
-    }
-
-    const an = track.arp[step];
-    if (an) {
-      const osc = ac.createOscillator();
-      const g = ac.createGain();
-      osc.type = track.arpType || 'triangle';
-      osc.frequency.value = noteFreq(an);
-      const dur = beat * 0.5;
-      g.gain.setValueAtTime(0, time);
-      g.gain.linearRampToValueAtTime(0.14, time + 0.005);
-      g.gain.exponentialRampToValueAtTime(0.001, time + dur);
-      // Subtle detune
-      const osc2 = ac.createOscillator();
-      osc2.type = osc.type;
-      osc2.frequency.value = noteFreq(an) * 1.005;
-      osc2.connect(g);
-      osc.connect(g).connect(out);
-      osc.start(time); osc2.start(time);
-      osc.stop(time + dur + 0.05); osc2.stop(time + dur + 0.05);
-    }
-
-    if (track.drum[step]) {
-      const bufSize = Math.floor(ac.sampleRate * 0.06);
-      const buf = ac.createBuffer(1, bufSize, ac.sampleRate);
-      const data = buf.getChannelData(0);
-      for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
-      const src = ac.createBufferSource();
-      src.buffer = buf;
-      const filter = ac.createBiquadFilter();
-      filter.type = 'highpass';
-      filter.frequency.value = 5500;
-      const g = ac.createGain();
-      g.gain.setValueAtTime(0.13, time);
-      g.gain.exponentialRampToValueAtTime(0.001, time + 0.06);
-      src.connect(filter).connect(g).connect(out);
-      src.start(time);
-    }
+    musicShouldPlay = false;
+    try { musicAudio.pause(); } catch (e) {}
   }
 
   function updateMusicBtn() {
@@ -832,6 +719,22 @@
     btn.textContent = musicMode === 0 ? '♪×' : '♪' + musicMode;
     btn.classList.toggle('off', musicMode === 0);
   }
+
+  // Pause music when tab/app goes to background, resume when back
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      try { musicAudio.pause(); } catch (e) {}
+    } else if (musicShouldPlay && musicMode > 0) {
+      musicAudio.play().catch(() => {});
+    }
+  });
+  window.addEventListener('pagehide', () => { try { musicAudio.pause(); } catch (e) {} });
+  window.addEventListener('blur', () => { try { musicAudio.pause(); } catch (e) {} });
+  window.addEventListener('focus', () => {
+    if (musicShouldPlay && musicMode > 0 && !document.hidden) {
+      musicAudio.play().catch(() => {});
+    }
+  });
 
   // ---------- Questions ----------
   function pickQuestion() {
@@ -1386,8 +1289,9 @@
     musicMode = (musicMode + 1) % 5;
     localStorage.setItem('reihen-music', musicMode);
     updateMusicBtn();
-    musicStop();
-    if (musicMode > 0 && state.screen === 'game' && !state.paused) {
+    if (musicMode === 0) {
+      musicStop();
+    } else if (state.screen === 'game' && !state.paused) {
       musicStart();
     }
   });
