@@ -688,6 +688,10 @@
     }
     return canvas.height - 80;
   }
+  // Mobile difficulty tuning so it's kid-friendly
+  const MOBILE_TUNE = { speed: 0.55, spawn: 1.6, levelSpeed: 0.5, maxActive: 2 };
+  const DESKTOP_TUNE = { speed: 1, spawn: 1, levelSpeed: 1, maxActive: 3 };
+  function tune() { return isMobileLayout() ? MOBILE_TUNE : DESKTOP_TUNE; }
 
   // ---------- Stars (background) ----------
   function initStars() {
@@ -707,7 +711,8 @@
     const q = pickQuestion();
     const radius = isMobileLayout() ? (32 + Math.random() * 8) : (48 + Math.random() * 12);
     const diff = DIFFS[state.difficulty];
-    const speed = diff.speed + (state.level - 1) * diff.levelSpeed + Math.random() * 0.1;
+    const t = tune();
+    const speed = (diff.speed + (state.level - 1) * diff.levelSpeed * t.levelSpeed) * t.speed + Math.random() * 0.08 * t.speed;
     state.asteroids.push({
       x: radius + Math.random() * (canvas.width - radius * 2),
       y: -radius,
@@ -839,8 +844,9 @@
     }
     // Spawn
     state.spawnTimer -= dt;
-    const spawnMs = Math.max(800, DIFFS[state.difficulty].spawnMs - (state.level - 1) * 120);
-    if (state.asteroids.length < 3 && state.spawnTimer <= 0) {
+    const t = tune();
+    const spawnMs = Math.max(800, (DIFFS[state.difficulty].spawnMs - (state.level - 1) * 120) * t.spawn);
+    if (state.asteroids.length < t.maxActive && state.spawnTimer <= 0) {
       spawnAsteroid();
       state.spawnTimer = spawnMs;
     }
@@ -1094,7 +1100,7 @@
     keypadRender();
     if (!isMobileLayout()) answerInput.focus();
     spawnAsteroid();
-    state.spawnTimer = DIFFS[state.difficulty].spawnMs;
+    state.spawnTimer = DIFFS[state.difficulty].spawnMs * tune().spawn;
   }
 
   function gameOver() {
