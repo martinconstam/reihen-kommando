@@ -298,8 +298,12 @@
     color: var(--ink);
     cursor: pointer;
     touch-action: manipulation;
-    transition: transform 0.05s, background 0.1s;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+    will-change: transform, background;
   }
+  .key.pressed { background: rgba(99, 226, 255, 0.35); transform: scale(0.93); }
   .key:active { background: rgba(99, 226, 255, 0.35); transform: scale(0.93); }
   .key-fn {
     color: var(--bad);
@@ -430,8 +434,8 @@
   <div class="panel">
     <h3>Schwierigkeit</h3>
     <div class="diff-row">
-      <button data-diff="kadett">Kadett</button>
-      <button data-diff="pilot" class="active">Pilot</button>
+      <button data-diff="kadett" class="active">Kadett</button>
+      <button data-diff="pilot">Pilot</button>
       <button data-diff="captain">Captain</button>
     </div>
   </div>
@@ -563,7 +567,7 @@
   const state = {
     screen: 'start',
     activeReihen: new Set(),
-    difficulty: 'pilot',
+    difficulty: 'kadett',
     muted: localStorage.getItem('reihen-muted') === '1',
     highscores: loadHighscores(),
     score: 0,
@@ -1279,10 +1283,29 @@
     keypadRender();
   }
   document.querySelectorAll('#keypad .key').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    // Use pointerdown so the press registers on finger-down, not on lift-off (snappier).
+    const onDown = (e) => {
       e.preventDefault();
+      btn.classList.add('pressed');
       keypadPress(btn.dataset.key);
-    });
+    };
+    const onUp = () => btn.classList.remove('pressed');
+    if ('PointerEvent' in window) {
+      btn.addEventListener('pointerdown', onDown);
+      btn.addEventListener('pointerup', onUp);
+      btn.addEventListener('pointercancel', onUp);
+      btn.addEventListener('pointerleave', onUp);
+    } else {
+      // Fallback for very old browsers
+      btn.addEventListener('touchstart', onDown, { passive: false });
+      btn.addEventListener('touchend', onUp);
+      btn.addEventListener('touchcancel', onUp);
+      btn.addEventListener('mousedown', onDown);
+      btn.addEventListener('mouseup', onUp);
+      btn.addEventListener('mouseleave', onUp);
+    }
+    // Suppress the synthetic click that follows pointer events to avoid double-fire
+    btn.addEventListener('click', (e) => e.preventDefault());
   });
 
   // Init
