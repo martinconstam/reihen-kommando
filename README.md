@@ -37,7 +37,7 @@ Einfach `index.html` im Browser öffnen – oder online:
 
 4 Tracks von [Eric Matyas (soundimage.org)](https://soundimage.org/), royalty-free mit Attribution:
 
-- Track 1: *When Machines Dream*
-- Track 2: *Urban Sci-Fi Heroes*
+- Track 1: *Urban Sci-Fi Heroes*
+- Track 2: *When Machines Dream*
 - Track 3: *Cyber City of Light*
 - Track 4: *Cosmic Switchboard*
