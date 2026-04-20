@@ -82,33 +82,33 @@
 
   .reihen-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
   }
-  .reihen-grid label {
+  .reihen-grid .cell {
     display: flex; align-items: center; justify-content: center;
-    padding: 12px 8px;
+    padding: 10px 4px;
     border: 2px solid rgba(99, 226, 255, 0.35);
     border-radius: 10px;
-    font-size: 20px;
+    font-size: 17px;
     font-weight: bold;
     cursor: pointer;
     background: rgba(5, 5, 26, 0.5);
-    transition: all 0.15s;
+    color: var(--ink);
+    transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
-  .reihen-grid label:hover {
+  .reihen-grid .cell:hover { border-color: var(--accent); color: var(--accent); }
+  .reihen-grid .cell.checked {
+    background: rgba(255, 228, 94, 0.18);
     border-color: var(--accent);
     color: var(--accent);
+    box-shadow: 0 0 10px rgba(255,228,94,0.3);
   }
-  .reihen-grid input { display: none; }
-  .reihen-grid input:checked + span {
-    color: var(--accent);
-  }
-  .reihen-grid label:has(input:checked) {
-    background: rgba(255, 228, 94, 0.15);
-    border-color: var(--accent);
-    box-shadow: 0 0 12px rgba(255,228,94,0.3);
-  }
+  .reihen-grid .cell:active { transform: scale(0.94); }
 
   .diff-row {
     display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
@@ -161,6 +161,17 @@
     cursor: pointer;
   }
   button.btn-ghost:hover { color: var(--ink); border-color: var(--ink); }
+
+  /* Mobile tweaks: more compact start-screen */
+  body.mobile h1 { font-size: clamp(28px, 9vw, 44px); letter-spacing: 2px; margin-bottom: 2px; }
+  body.mobile .subtitle { font-size: 13px; margin-bottom: 14px; }
+  body.mobile .panel { padding: 12px 14px; margin-bottom: 10px; }
+  body.mobile .panel h3 { font-size: 15px; margin-bottom: 10px; }
+  body.mobile button.btn-primary { padding: 12px 32px; font-size: 18px; letter-spacing: 1px; }
+  body.mobile .diff-row button { padding: 10px; font-size: 14px; min-width: 0; }
+  body.mobile .btn-ghost { padding: 8px 14px; font-size: 13px; }
+  body.mobile #install-panel { padding: 10px 14px; font-size: 13px; }
+  body.mobile #install-panel button { padding: 8px 20px; font-size: 14px; }
 
   .highscore {
     color: var(--accent);
@@ -1121,20 +1132,31 @@
     const grid = $('reihen-grid');
     grid.innerHTML = '';
     for (let i = 1; i <= 10; i++) {
-      const label = document.createElement('label');
-      const input = document.createElement('input');
-      input.type = 'checkbox';
-      input.value = i;
-      input.checked = state.activeReihen.has(i);
-      input.addEventListener('change', () => {
-        if (input.checked) state.activeReihen.add(i);
-        else state.activeReihen.delete(i);
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.value = i;
+      cell.textContent = i + 'er';
+      cell.setAttribute('role', 'checkbox');
+      cell.setAttribute('tabindex', '0');
+      if (state.activeReihen.has(i)) cell.classList.add('checked');
+      cell.setAttribute('aria-checked', state.activeReihen.has(i) ? 'true' : 'false');
+      const toggle = (e) => {
+        e.preventDefault();
+        if (state.activeReihen.has(i)) {
+          state.activeReihen.delete(i);
+          cell.classList.remove('checked');
+          cell.setAttribute('aria-checked', 'false');
+        } else {
+          state.activeReihen.add(i);
+          cell.classList.add('checked');
+          cell.setAttribute('aria-checked', 'true');
+        }
+      };
+      cell.addEventListener('click', toggle);
+      cell.addEventListener('keydown', (e) => {
+        if (e.key === ' ' || e.key === 'Enter') toggle(e);
       });
-      const span = document.createElement('span');
-      span.textContent = i + 'er';
-      label.appendChild(input);
-      label.appendChild(span);
-      grid.appendChild(label);
+      grid.appendChild(cell);
     }
   }
 
