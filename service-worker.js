@@ -1,15 +1,32 @@
-const CACHE = 'reihen-v11';
-const ASSETS = [
+const CACHE = 'reihen-v12';
+// Core assets - install fails if any are missing
+const CORE = [
   './',
   'index.html',
   'manifest.webmanifest',
   'icon.svg'
 ];
+// Music tracks - nice-to-have, cached best-effort so SW still installs if a download fails
+const MUSIC = [
+  'music/track1.mp3',
+  'music/track2.mp3',
+  'music/track3.mp3',
+  'music/track4.mp3'
+];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
-  );
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    await cache.addAll(CORE);
+    // Music is best-effort: fetch each individually, ignore failures
+    await Promise.all(MUSIC.map(async (url) => {
+      try {
+        const res = await fetch(url, { cache: 'reload' });
+        if (res.ok) await cache.put(url, res);
+      } catch (e) {}
+    }));
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', (event) => {
