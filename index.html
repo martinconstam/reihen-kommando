@@ -459,7 +459,7 @@
     <ol class="hs-list" id="hs-list"></ol>
   </div>
 
-  <p class="music-credit">Musik: <a href="https://incompetech.com/" target="_blank" rel="noopener">Kevin MacLeod</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></p>
+  <p class="music-credit">Musik: <a href="https://soundimage.org/" target="_blank" rel="noopener">Eric Matyas (soundimage.org)</a></p>
 </div>
 
 <!-- Game screen -->
@@ -672,13 +672,13 @@
   };
   function updateMuteBtn() { $('mute-btn').textContent = state.muted ? '🔇' : '🔊'; }
 
-  // ---------- Music (4 royalty-free tracks by Kevin MacLeod, CC-BY) ----------
+  // ---------- Music (4 royalty-free tracks by Eric Matyas, soundimage.org) ----------
   const MUSIC_TRACKS = [
     null,
-    { name: '8bit Dungeon Boss',  src: 'music/track1.mp3' },
-    { name: '8bit Dungeon Level', src: 'music/track2.mp3' },
-    { name: 'Bit Quest',          src: 'music/track3.mp3' },
-    { name: 'Bit Shift',          src: 'music/track4.mp3' },
+    { name: 'When Machines Dream',  src: 'music/track1.mp3' },
+    { name: 'Urban Sci-Fi Heroes',  src: 'music/track2.mp3' },
+    { name: 'Cyber City of Light',  src: 'music/track3.mp3' },
+    { name: 'Cosmic Switchboard',   src: 'music/track4.mp3' },
   ];
 
   let musicMode = parseInt(localStorage.getItem('reihen-music') || '1', 10);

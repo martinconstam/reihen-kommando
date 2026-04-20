@@ -35,9 +35,9 @@ Einfach `index.html` im Browser öffnen – oder online:
 
 ## Musik-Credits
 
-4 Tracks von [Kevin MacLeod (incompetech.com)](https://incompetech.com/), lizenziert unter [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/):
+4 Tracks von [Eric Matyas (soundimage.org)](https://soundimage.org/), royalty-free mit Attribution:
 
-- Track 1: *8bit Dungeon Boss*
-- Track 2: *8bit Dungeon Level*
-- Track 3: *Bit Quest*
-- Track 4: *Bit Shift*
+- Track 1: *When Machines Dream*
+- Track 2: *Urban Sci-Fi Heroes*
+- Track 3: *Cyber City of Light*
+- Track 4: *Cosmic Switchboard*
