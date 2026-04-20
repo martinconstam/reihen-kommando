@@ -1,4 +1,4 @@
-const CACHE = 'reihen-v2';
+const CACHE = 'reihen-v3';
 const ASSETS = [
   './',
   'index.html',

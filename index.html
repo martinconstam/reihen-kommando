@@ -366,6 +366,34 @@
   .stats b { color: var(--bad); }
 
   .btn-row { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; justify-content: center; }
+
+  /* Install PWA */
+  #install-panel {
+    max-width: 640px; width: 100%;
+    margin-top: 14px;
+    padding: 14px 18px;
+    border: 2px dashed rgba(94, 255, 154, 0.5);
+    border-radius: 12px;
+    background: rgba(94, 255, 154, 0.08);
+    color: var(--ink);
+    font-size: 14px;
+    text-align: center;
+  }
+  #install-panel .install-title { color: var(--good); font-weight: bold; margin-bottom: 8px; font-size: 16px; }
+  #install-panel button {
+    margin-top: 10px;
+    padding: 10px 24px;
+    font-size: 15px;
+    font-weight: bold;
+    background: var(--good);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  #install-panel button:active { transform: scale(0.97); }
+  #install-panel .ios-hint { line-height: 1.6; }
+  #install-panel .ios-hint b { color: var(--accent); }
 </style>
 </head>
 <body>
@@ -394,6 +422,12 @@
   </div>
 
   <button class="btn-primary" id="btn-start">START</button>
+
+  <div id="install-panel" hidden>
+    <div class="install-title">📱 Als App installieren</div>
+    <div id="install-text"></div>
+    <button id="btn-install" hidden>Jetzt installieren</button>
+  </div>
 
   <div class="panel" id="hs-panel" hidden>
     <h3>🏆 Bestenliste</h3>
@@ -1231,6 +1265,68 @@
       navigator.serviceWorker.register('service-worker.js').catch(() => {});
     });
   }
+
+  // ---------- PWA install prompt ----------
+  const installPanel = $('install-panel');
+  const installText = $('install-text');
+  const installBtn = $('btn-install');
+  let deferredInstallPrompt = null;
+
+  function isStandalone() {
+    return window.matchMedia('(display-mode: standalone)').matches
+        || window.matchMedia('(display-mode: fullscreen)').matches
+        || window.navigator.standalone === true;
+  }
+  function isIos() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  }
+  function isAndroid() {
+    return /Android/i.test(navigator.userAgent);
+  }
+
+  function refreshInstallPanel() {
+    if (isStandalone()) {
+      installPanel.hidden = true;
+      return;
+    }
+    if (deferredInstallPrompt) {
+      installText.textContent = 'Spiel auf den Home-Bildschirm packen - läuft dann wie eine richtige App (auch ohne Internet).';
+      installBtn.hidden = false;
+      installPanel.hidden = false;
+    } else if (isIos()) {
+      installText.innerHTML = 'Auf iPhone/iPad: <b>Teilen-Symbol</b> unten antippen → <b>"Zum Home-Bildschirm"</b>. Dann läuft das Spiel wie eine richtige App.';
+      installBtn.hidden = true;
+      installPanel.hidden = false;
+    } else if (isAndroid()) {
+      installText.innerHTML = 'Auf Android: Browser-Menü (⋮) → <b>"App installieren"</b> oder <b>"Zum Startbildschirm hinzufügen"</b>.';
+      installBtn.hidden = true;
+      installPanel.hidden = false;
+    } else {
+      installPanel.hidden = true;
+    }
+  }
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    refreshInstallPanel();
+  });
+
+  installBtn.addEventListener('click', async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    const { outcome } = await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    if (outcome === 'accepted') installPanel.hidden = true;
+    else refreshInstallPanel();
+  });
+
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    installPanel.hidden = true;
+  });
+
+  refreshInstallPanel();
 
 })();
 </script>
