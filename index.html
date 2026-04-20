@@ -2,7 +2,15 @@
 <html lang="de-CH">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#05051a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Reihen">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
 <title>Reihen-Kommando</title>
 <style>
   :root {
@@ -169,12 +177,14 @@
   #hud {
     position: absolute;
     top: 0; left: 0; right: 0;
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 12px 16px;
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    padding: 12px 124px 12px 16px;
+    padding-top: max(12px, env(safe-area-inset-top));
     font-weight: bold;
     font-size: clamp(14px, 2.2vw, 18px);
     pointer-events: none;
     z-index: 2;
+    flex-wrap: wrap;
   }
   #hud > div { background: rgba(5,5,26,0.6); padding: 6px 12px; border-radius: 8px; pointer-events: auto; }
   #hud .lives { color: var(--bad); }
@@ -183,7 +193,8 @@
   #hud .level { color: var(--good); }
 
   #mute-btn, #abort-btn {
-    position: absolute; top: 12px;
+    position: absolute;
+    top: max(12px, env(safe-area-inset-top));
     width: 44px; height: 44px;
     border-radius: 50%;
     background: rgba(5,5,26,0.6);
@@ -260,6 +271,26 @@
     margin: 10px 0 20px;
     animation: pulse 1.2s infinite;
   }
+  .hs-list {
+    list-style: none; padding: 0; margin: 0;
+  }
+  .hs-list li {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px;
+    margin-bottom: 6px;
+    border-radius: 8px;
+    background: rgba(5, 5, 26, 0.5);
+    border: 1px solid rgba(99, 226, 255, 0.2);
+    font-size: 16px;
+  }
+  .hs-list li.new {
+    background: rgba(255, 228, 94, 0.15);
+    border-color: var(--accent);
+    box-shadow: 0 0 12px rgba(255,228,94,0.3);
+  }
+  .hs-list .rank { color: var(--dim); font-weight: bold; width: 32px; }
+  .hs-list .score-val { color: var(--accent); font-weight: bold; font-size: 20px; }
+  .hs-list .meta { color: var(--dim); font-size: 12px; text-align: right; }
   @keyframes pulse {
     0%,100% { transform: scale(1); }
     50% { transform: scale(1.08); }
@@ -301,7 +332,11 @@
   </div>
 
   <button class="btn-primary" id="btn-start">START</button>
-  <div class="highscore">🏆 Rekord: <span id="hs-start">0</span></div>
+
+  <div class="panel" id="hs-panel" hidden>
+    <h3>🏆 Bestenliste</h3>
+    <ol class="hs-list" id="hs-list"></ol>
+  </div>
 </div>
 
 <!-- Game screen -->
@@ -329,6 +364,10 @@
   <div class="panel">
     <div class="stats" id="stats"></div>
   </div>
+  <div class="panel" id="hs-panel-over" hidden>
+    <h3>🏆 Bestenliste</h3>
+    <ol class="hs-list" id="hs-list-over"></ol>
+  </div>
   <div class="btn-row">
     <button class="btn-primary" id="btn-again">Nochmal</button>
     <button class="btn-ghost" id="btn-home">Zurück zum Start</button>
@@ -339,13 +378,66 @@
 (() => {
   'use strict';
 
+  // ---------- Highscores ----------
+  const HS_KEY = 'reihen-highscores';
+  const HS_MAX = 5;
+  function loadHighscores() {
+    try {
+      const raw = localStorage.getItem(HS_KEY);
+      if (raw) return JSON.parse(raw);
+      // Migrate legacy single-value key
+      const legacy = parseInt(localStorage.getItem('reihen-highscore') || '0', 10);
+      if (legacy > 0) return [{ score: legacy, level: 1, difficulty: 'pilot', date: Date.now() }];
+    } catch (e) {}
+    return [];
+  }
+  function saveHighscores(list) {
+    localStorage.setItem(HS_KEY, JSON.stringify(list.slice(0, HS_MAX)));
+  }
+  function addHighscore(entry) {
+    const list = loadHighscores();
+    list.push(entry);
+    list.sort((a, b) => b.score - a.score);
+    const trimmed = list.slice(0, HS_MAX);
+    saveHighscores(trimmed);
+    const rank = trimmed.findIndex(e => e === entry);
+    return { list: trimmed, rank, isNew: rank >= 0 };
+  }
+  function formatHsDate(ts) {
+    const d = new Date(ts);
+    return d.toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  }
+  function renderHighscoreList(container, newEntry) {
+    const list = state.highscores;
+    container.innerHTML = '';
+    if (list.length === 0) {
+      const li = document.createElement('li');
+      li.textContent = 'Noch keine Einträge – spiel dich in die Bestenliste!';
+      li.style.justifyContent = 'center';
+      li.style.color = 'var(--dim)';
+      container.appendChild(li);
+      return;
+    }
+    list.forEach((e, i) => {
+      const li = document.createElement('li');
+      if (e === newEntry) li.classList.add('new');
+      const diffLabel = { kadett: 'Kadett', pilot: 'Pilot', captain: 'Captain' }[e.difficulty] || e.difficulty;
+      li.innerHTML = `
+        <span class="rank">#${i + 1}</span>
+        <span class="score-val">${e.score}</span>
+        <span class="meta">Lv ${e.level} · ${diffLabel}<br>${formatHsDate(e.date)}</span>
+      `;
+      container.appendChild(li);
+    });
+  }
+
   // ---------- State ----------
   const state = {
     screen: 'start',
     activeReihen: new Set(),
     difficulty: 'pilot',
     muted: localStorage.getItem('reihen-muted') === '1',
-    highscore: parseInt(localStorage.getItem('reihen-highscore') || '0', 10),
+    highscores: loadHighscores(),
     score: 0,
     combo: 0,
     lives: 3,
@@ -811,7 +903,14 @@
     screenStart.hidden = false;
     screenGame.hidden = true;
     screenOver.hidden = true;
-    $('hs-start').textContent = state.highscore;
+    state.highscores = loadHighscores();
+    const hsPanel = $('hs-panel');
+    if (state.highscores.length > 0) {
+      hsPanel.hidden = false;
+      renderHighscoreList($('hs-list'), null);
+    } else {
+      hsPanel.hidden = true;
+    }
   }
 
   function startGame() {
@@ -849,13 +948,20 @@
   function gameOver() {
     state.screen = 'over';
     sfx.gameover();
-    const isRecord = state.score > state.highscore;
-    if (isRecord) {
-      state.highscore = state.score;
-      localStorage.setItem('reihen-highscore', state.highscore);
-    }
+    const entry = { score: state.score, level: state.level, difficulty: state.difficulty, date: Date.now() };
+    const { list, rank, isNew } = addHighscore(entry);
+    state.highscores = list;
+    const isTop = isNew && rank >= 0;
+    const isNewBest = isTop && rank === 0 && state.score > 0;
     $('final-score').textContent = state.score;
-    $('record-banner').hidden = !isRecord;
+    $('record-banner').hidden = !isNewBest;
+    const hsPanelOver = $('hs-panel-over');
+    if (list.length > 0) {
+      hsPanelOver.hidden = false;
+      renderHighscoreList($('hs-list-over'), isTop ? entry : null);
+    } else {
+      hsPanelOver.hidden = true;
+    }
 
     const errEntries = Object.entries(state.errors)
       .map(([k, v]) => [parseInt(k, 10), v])
@@ -964,9 +1070,16 @@
 
   // Init
   updateMuteBtn();
-  $('hs-start').textContent = state.highscore;
+  showStart();
   resize();
   requestAnimationFrame(tick);
+
+  // Service Worker registration (PWA)
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    });
+  }
 
 })();
 </script>
