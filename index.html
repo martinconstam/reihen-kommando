@@ -182,8 +182,8 @@
   #hud .combo { color: var(--accent2); }
   #hud .level { color: var(--good); }
 
-  #mute-btn {
-    position: absolute; top: 12px; right: 12px;
+  #mute-btn, #abort-btn {
+    position: absolute; top: 12px;
     width: 44px; height: 44px;
     border-radius: 50%;
     background: rgba(5,5,26,0.6);
@@ -193,6 +193,14 @@
     cursor: pointer;
     z-index: 3;
   }
+  #mute-btn { right: 12px; }
+  #abort-btn {
+    right: 64px;
+    border-color: rgba(255, 94, 108, 0.5);
+    color: var(--bad);
+    font-weight: bold;
+  }
+  #abort-btn:hover { background: rgba(255, 94, 108, 0.2); }
 
   #answer-wrap {
     position: absolute;
@@ -299,6 +307,7 @@
 <!-- Game screen -->
 <div id="screen-game" class="screen" hidden style="padding:0;">
   <canvas id="game-canvas"></canvas>
+  <button id="abort-btn" title="Abbrechen">✕</button>
   <button id="mute-btn">🔊</button>
   <div id="hud">
     <div class="score">⭐ <span id="hud-score">0</span></div>
@@ -920,6 +929,14 @@
     updateMuteBtn();
   });
 
+  $('abort-btn').addEventListener('click', () => {
+    if (confirm('Spiel wirklich abbrechen?')) {
+      state.paused = false;
+      $('pause-overlay').hidden = true;
+      showStart();
+    }
+  });
+
   answerInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -938,7 +955,7 @@
 
   // Keep focus on input while playing
   screenGame.addEventListener('click', (e) => {
-    if (state.screen === 'game' && !state.paused && e.target !== $('mute-btn') && e.target.tagName !== 'BUTTON') {
+    if (state.screen === 'game' && !state.paused && e.target.tagName !== 'BUTTON') {
       answerInput.focus();
     }
   });
